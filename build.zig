@@ -12,20 +12,26 @@ pub fn build_for_target(b: *std.Build, target: std.Build.ResolvedTarget) void {
     const arch = target.query.cpu_arch;
     const os = target.query.os_tag;
 
-    const target_name = std.fmt.allocPrint(std.heap.page_allocator, "boopbeep-{s}-{s}", .{
-        switch (arch.?) {
-            .aarch64 => "aarch64",
-            .x86_64 => "x86",
-            .arm => "arm",
-            else => "arch"
-        },
-        switch (os.?) {
-            .windows => "windows",
-            .linux => "linux",
-            .macos => "macos",
-            else => "os"
+    const target_name = blk: {
+        if(arch == null or os == null) {
+            break :blk "boopbeep";
         }
-    }) catch "boopbeep";
+
+        break :blk std.fmt.allocPrint(std.heap.page_allocator, "boopbeep-{s}-{s}", .{
+            switch (arch.?) {
+                .aarch64 => "aarch64",
+                .x86_64 => "x86",
+                .arm => "arm",
+                else => "arch"
+            },
+            switch (os.?) {
+                .windows => "windows",
+                .linux => "linux",
+                .macos => "macos",
+                else => "os"
+            }
+        }) catch "boopbeep";
+    };
 
     const root_mod = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
@@ -53,7 +59,14 @@ pub fn build_for_target(b: *std.Build, target: std.Build.ResolvedTarget) void {
 }
 
 pub fn build(b: *std.Build) void {
-    for(cross_compile_targets) |target| {
-        build_for_target(b, b.resolveTargetQuery(target));
+    const cross_compile = b.option(bool, "cross_compile", "Do cross compilation for all platforms") orelse false;
+
+    if(cross_compile) {
+        for(cross_compile_targets) |target_query| {
+            build_for_target(b, b.resolveTargetQuery(target_query));
+        }
+    } else {
+        const target = b.standardTargetOptions(.{});
+        build_for_target(b, target);
     }
 }
