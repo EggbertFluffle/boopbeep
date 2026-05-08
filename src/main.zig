@@ -59,7 +59,7 @@ pub fn main(init: std.process.Init) void {
     var sound_map: std.StringHashMap(*Trigger) = std.StringHashMap(*Trigger).init(allocator);
 
     // Or if a sound is still playing
-    while (!quit or ) {
+    while (!quit) {
         const input = stdin.takeDelimiterExclusive('\n') catch {
             io.sleep(.fromMilliseconds(NO_INPUT_SLEEP_TIME_MS), .real) catch {};
             continue;
