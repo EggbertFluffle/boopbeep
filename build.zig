@@ -42,15 +42,15 @@ pub fn build_for_target(b: *std.Build, target: std.Build.ResolvedTarget, strip: 
     });
 
     root_mod.addCSourceFile(.{
-        .file = b.path("src/miniaudio.c"),
+        .file = b.dependency("miniaudio", .{}).path("miniaudio.c"),
         .flags = &.{
             // "-DMA_IMPLEMENTATION",
             // "-march=native",     // OR use this to auto-detect your CPU features
             "-fno-sanitize=undefined",  // Clang 21 inserts UD2 traps; disable them
         }
     });
-    root_mod.addIncludePath(b.path("lib/"));
-    
+    root_mod.addIncludePath(b.dependency("miniaudio", .{}).path("."));
+
     const exe = b.addExecutable(.{
         .name = target_name,
         .root_module = root_mod
