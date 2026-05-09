@@ -4,10 +4,11 @@
 
 const std = @import("std");
 const Trigger = @import("Trigger.zig");
-const ma = @import("c.zig").ma;
+const Utils = @import("Utils.zig");
+const ma = @import("c");
 
 pub fn oomPanic() noreturn {
-  std.log.err("Out of memory error, exiting with 1", .{});
+  stderr.print("Out of memory error, exiting with 1", .{}) catch {};
   std.process.exit(1);
 }
 
@@ -20,7 +21,7 @@ var stderr_buffer: [512]u8 = undefined;
 var stderr: *std.Io.Writer = undefined;
 
 const MAX_SOUNDS_DEFAULT: u32 = 15;
-const NO_INPUT_SLEEP_TIME_MS: i64 = 100;
+const NO_INPUT_SLEEP_TIME_MS: i64 = 10;
 
 pub fn main(init: std.process.Init) void {
     defer oomPanic();
@@ -51,30 +52,39 @@ pub fn main(init: std.process.Init) void {
     var engine_config: ma.ma_engine_config = ma.ma_engine_config_init();
     engine_config.channels = 32;
 
-    if (0 != ma.ma_engine_init(&engine_config, &engine)) {
-        stderr.print("Failed to initialize miniaudio engine\n", .{}) catch {};
-        std.process.exit(1);
+    {
+        const result = ma.ma_engine_init(&engine_config, &engine);
+        if (result != ma.MA_SUCCESS) {
+            stderr.print("Failed to initialize audio engine: {s}\n", .{ Utils.ma_get_error(result) }) catch {};
+            std.process.exit(1);
+        }
     }
 
     var sound_map: std.StringHashMap(*Trigger) = std.StringHashMap(*Trigger).init(allocator);
 
     // Or if a sound is still playing
     while (!quit) {
-        const input = stdin.takeDelimiterExclusive('\n') catch {
-            io.sleep(.fromMilliseconds(NO_INPUT_SLEEP_TIME_MS), .real) catch {};
-            continue;
+        const input = stdin.takeDelimiterExclusive('\n') catch |err| switch (err) {
+            error.EndOfStream => {
+                // Parent has hungup
+                quit = true;
+                break;
+            },
+            else => {
+                stderr.print("stderr read error: {}\n", .{err}) catch {};
+                break;
+            }
         };
+        std.debug.print("Running loop\n", .{});
 
         // Discard the trailing \n
-        _ = stdin.discard(.limited(1)) catch unreachable;
+        _ = stdin.discard(.limited(1)) catch {};
 
         var args = std.mem.tokenizeSequence(u8, input, &.{' '});
         const command = args.next();
 
-        if(command == null) {
-            stderr.print("No command provided, try \"load_sound\" or \"play_sound\"\n", .{}) catch {};
-            continue;
-        }
+        // No command provided
+        if(command == null) continue;
 
         if(std.mem.eql(u8, command.?, "load_sound")) {
             const trigger_name = args.next();
@@ -84,7 +94,7 @@ pub fn main(init: std.process.Init) void {
 
             // Probably a better way to validate input
             if(trigger_name == null or file_path == null) {
-                stderr.print("Incorrect use of \"load_sound\": usage $ load_sound <trigger_name> <file_path>", .{}) catch {};
+                stderr.print("Incorrect use of \"load_sound\": usage $ load_sound <trigger_name> <file_path>\n", .{}) catch {};
                 continue;
             }
 
@@ -97,7 +107,7 @@ pub fn main(init: std.process.Init) void {
             const trigger_name = args.next();
 
             if(trigger_name == null) {
-                _ = stderr.write("Incorrect use of \"play_sound\": usage $ play_sound <trigger_name>") catch { };
+                stderr.print("Incorrect use of \"play_sound\": usage $ play_sound <trigger_name>", .{}) catch { };
                 continue;
             }
 
@@ -108,23 +118,26 @@ pub fn main(init: std.process.Init) void {
             const vol_arg = args.next();
 
             if(vol_arg == null) {
-                _ = stderr.write("Incorrect use of \"master_volume\": usage $ master_volume <volume 1-100>") catch { };
+                stderr.print("Incorrect use of \"master_volume\": usage $ master_volume <volume 1-100>", .{}) catch { };
                 continue;
             }
             
             var volume: f32 = std.fmt.parseFloat(f32, vol_arg.?) catch 1.0;
             volume = if (volume > 1.0) 1.0 else (if (volume < 0.0) 0.0 else volume);
 
-            if(ma.ma_engine_set_volume(&engine, volume) != ma.MA_SUCCESS) {
-                _ = stderr.write("Volume unable to be set") catch { };
-                continue;
+            {
+                const result = ma.ma_engine_set_volume(&engine, volume);
+                if(result != ma.MA_SUCCESS) {
+                    stderr.print("Unable to set volume: {s}", .{ Utils.ma_get_error(result) }) catch { };
+                    continue;
+                }
             }
         } else if (std.mem.eql(u8, command.?, "trigger_volume")) {
             const trigger_name = args.next();
             const vol_arg = args.next();
 
             if(trigger_name == null or vol_arg == null) {
-                _ = stderr.write("Incorrect use of \"trigger_volume\": usage $ sound_volume <trigger_name> <volume 1-100>") catch { };
+                stderr.print("Incorrect use of \"trigger_volume\": usage $ sound_volume <trigger_name> <volume 1-100>", .{}) catch { };
                 continue;
             }
             

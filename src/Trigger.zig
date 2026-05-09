@@ -1,5 +1,5 @@
 const std = @import("std");
-const ma = @import("c.zig").ma;
+const ma = @import("c");
 
 const Utils = @import("Utils.zig");
 
@@ -11,6 +11,7 @@ pub fn oomPanic() noreturn {
 const Trigger = @This();
 
 sounds: std.ArrayList(std.ArrayList(*ma.ma_sound)) = undefined,
+sound_group: ma.ma_sound_group = undefined,
 
 pub fn init(allocator: std.mem.Allocator) *Trigger {
     errdefer oomPanic();
@@ -44,31 +45,39 @@ pub fn load_sound(
     allocator: std.mem.Allocator
 ) void {
     errdefer oomPanic();
+    stderr.print("Starting to load sound\n", .{}) catch {};
 
     var sound = try std.ArrayList(*ma.ma_sound).initCapacity(allocator, 4);
 
     // File path should be checked already with the lua plugin
     const c_file_path = try std.fmt.allocPrintSentinel(allocator, "{s}", .{file_path}, 0);
 
+    stderr.print("Loading path {s}", .{ file_path }) catch {};
     for(0..max_sounds) |_| {
         const audio: *ma.ma_sound = try allocator.create(ma.ma_sound);
 
         const result = ma.ma_sound_init_from_file(engine, c_file_path, 0, null, null, audio);
-
         if(result != ma.MA_SUCCESS) {
-            try stderr.print("Failed to load sound file: {s}", .{Utils.ma_get_error(result)});
+            stderr.print("Failed to load sound file: {s}", .{Utils.ma_get_error(result)}) catch {};
             return;
         }
 
         try sound.append(allocator, audio);
     }
 
+    std.debug.print("appending new sound {}\n", .{self});
     try self.sounds.append(allocator, sound);
 }
 
 pub fn play_sound(self: *const Trigger, rand: *const std.Random, stderr: *std.Io.Writer) void {
-    const rand_index: usize = rand.intRangeLessThan(usize, 0, self.sounds.items.len) ;
-    const sound: std.ArrayList(*ma.ma_sound) = self.sounds.items[rand_index];
+    std.debug.print("Playing with sound len {d}\n", .{self.sounds.items.len});
+    const index: usize = switch (self.sounds.items.len) {
+        0 => { return; },
+        1 => 0,
+        else => rand.intRangeLessThan(usize, 0, self.sounds.items.len)
+    };
+
+    const sound: std.ArrayList(*ma.ma_sound) = self.sounds.items[index];
 
     for(sound.items) |s| {
         const sound_c_ptr: [*c]ma.ma_sound = @ptrCast(s);

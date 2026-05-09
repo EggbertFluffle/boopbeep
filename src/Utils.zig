@@ -1,5 +1,5 @@
 const std = @import("std");
-const ma = @import("c.zig").ma;
+const ma = @import("c");
 
 pub const Utils = @This();
 
