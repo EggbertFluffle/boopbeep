@@ -8,7 +8,7 @@ const cross_compile_targets = [_]std.Target.Query {
     .{ .cpu_arch = .x86_64, .os_tag = .windows, .abi = .gnu }
 };
 
-pub fn build_for_target(b: *std.Build, target: std.Build.ResolvedTarget) void {
+pub fn build_for_target(b: *std.Build, target: std.Build.ResolvedTarget, strip: bool) void {
     const arch = target.query.cpu_arch;
     const os = target.query.os_tag;
 
@@ -37,7 +37,8 @@ pub fn build_for_target(b: *std.Build, target: std.Build.ResolvedTarget) void {
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = .ReleaseSafe,
-        .link_libc = true
+        .link_libc = true,
+        .strip = strip
     });
 
     root_mod.addCSourceFile(.{
@@ -60,13 +61,14 @@ pub fn build_for_target(b: *std.Build, target: std.Build.ResolvedTarget) void {
 
 pub fn build(b: *std.Build) void {
     const cross_compile = b.option(bool, "cross_compile", "Do cross compilation for all platforms") orelse false;
+    const strip = b.option(bool, "strip", "Strip debug information from the produced binaries") orelse false;
 
     if(cross_compile) {
         for(cross_compile_targets) |target_query| {
-            build_for_target(b, b.resolveTargetQuery(target_query));
+            build_for_target(b, b.resolveTargetQuery(target_query), strip);
         }
     } else {
         const target = b.standardTargetOptions(.{});
-        build_for_target(b, target);
+        build_for_target(b, target, strip);
     }
 }
