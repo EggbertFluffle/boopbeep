@@ -84,7 +84,7 @@ pub fn main(init: std.process.Init) void {
 
             // Probably a better way to validate input
             if(trigger_name == null or file_path == null) {
-                _ = stderr.write("Incorrect use of \"load_sound\": usage $ load_sound <trigger_name> <file_path>") catch {};
+                stderr.print("Incorrect use of \"load_sound\": usage $ load_sound <trigger_name> <file_path>", .{}) catch {};
                 continue;
             }
 
@@ -133,18 +133,15 @@ pub fn main(init: std.process.Init) void {
 
             var trigger = sound_map.get(trigger_name.?);
             if(trigger == null) {
-                stderr.print("Sound \"{s}\" does not exist as a loaded sound", .{trigger_name.?}) catch { };
+                continue;
             }
 
             trigger.?.set_volume(volume);
         } else if (std.mem.eql(u8, command.?, "mute")) {
-            _ = stderr.write("Muting") catch { };
             mute = true;
         } else if (std.mem.eql(u8, command.?, "unmute")) {
-            _ = stderr.write("Unmuting") catch { };
             mute = false;
         } else if (std.mem.eql(u8, command.?, "toggle_mute")) {
-            _ = stderr.write("Toggling mute") catch { };
             mute = !mute;
         } else if (std.mem.eql(u8, command.?, "quit")) {
             quit = true;
@@ -190,9 +187,7 @@ pub fn play_sound(
     rand: *const std.Random
 ) void {
     const trigger = sound_map.get(trigger_name);
-    std.debug.print("trigger is {s}\n", .{trigger_name});
     if(trigger != null) {
-        std.debug.print("Playing sound deep\n", .{});
         trigger.?.play_sound(rand, stderr);
     }
 }

@@ -53,11 +53,10 @@ pub fn load_sound(
     for(0..max_sounds) |_| {
         const audio: *ma.ma_sound = try allocator.create(ma.ma_sound);
 
-        std.debug.print("file_path: '{s}'", .{c_file_path});
         const result = ma.ma_sound_init_from_file(engine, c_file_path, 0, null, null, audio);
 
         if(result != ma.MA_SUCCESS) {
-            _ = try stderr.write(Utils.ma_get_error(result));
+            try stderr.print("Failed to load sound file: {s}", .{Utils.ma_get_error(result)});
             return;
         }
 
@@ -71,13 +70,10 @@ pub fn play_sound(self: *const Trigger, rand: *const std.Random, stderr: *std.Io
     const rand_index: usize = rand.intRangeLessThan(usize, 0, self.sounds.items.len) ;
     const sound: std.ArrayList(*ma.ma_sound) = self.sounds.items[rand_index];
 
-    std.debug.print("Playing sound deeper\n", .{});
-
     for(sound.items) |s| {
         const sound_c_ptr: [*c]ma.ma_sound = @ptrCast(s);
 
         if(ma.ma_sound_is_playing(sound_c_ptr) == ma.MA_FALSE) {
-            std.debug.print("Playing sound deepest\n", .{});
             if(ma.ma_sound_start(sound_c_ptr) != ma.MA_SUCCESS) {
                 stderr.print("Failed to play sound\n", .{}) catch {};
             } else {
