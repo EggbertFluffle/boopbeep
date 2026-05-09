@@ -3,8 +3,8 @@ const std = @import("std");
 const cross_compile_targets = [_]std.Target.Query{
     .{ .cpu_arch = .x86_64, .os_tag = .linux, .abi = .gnu },
     .{ .cpu_arch = .aarch64, .os_tag = .linux, .abi = .gnu },
-    .{ .cpu_arch = .x86_64, .os_tag = .macos, .abi = .none },
-    .{ .cpu_arch = .aarch64, .os_tag = .macos, .abi = .none },
+    // .{ .cpu_arch = .x86_64, .os_tag = .macos, .abi = .none },
+    // .{ .cpu_arch = .aarch64, .os_tag = .macos, .abi = .none },
     .{ .cpu_arch = .x86_64, .os_tag = .windows, .abi = .gnu },
     .{ .cpu_arch = .aarch64, .os_tag = .windows, .abi = .gnu },
 };
