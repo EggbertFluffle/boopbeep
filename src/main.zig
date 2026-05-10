@@ -63,7 +63,8 @@ pub fn main(init: std.process.Init) void {
     var sound_map: std.StringHashMap(*Trigger) = std.StringHashMap(*Trigger).init(allocator);
 
     // Or if a sound is still playing
-    while (!quit) {
+    while (!quit or is_playing(&sound_map)) {
+        quit = false;
         const input = stdin.takeDelimiterExclusive('\n') catch |err| switch (err) {
             error.EndOfStream => {
                 // Parent has hungup
@@ -75,7 +76,6 @@ pub fn main(init: std.process.Init) void {
                 break;
             }
         };
-        std.debug.print("Running loop\n", .{});
 
         // Discard the trailing \n
         _ = stdin.discard(.limited(1)) catch {};
@@ -121,12 +121,14 @@ pub fn main(init: std.process.Init) void {
                 stderr.print("Incorrect use of \"master_volume\": usage $ master_volume <volume 1-100>", .{}) catch { };
                 continue;
             }
+
+            stderr.print("vol arg: {s}\n", .{ vol_arg.? }) catch {};
             
-            var volume: f32 = std.fmt.parseFloat(f32, vol_arg.?) catch 1.0;
-            volume = if (volume > 1.0) 1.0 else (if (volume < 0.0) 0.0 else volume);
+            var volume: f32 = @floatFromInt(std.fmt.parseInt(i32, vol_arg.?, 10) catch 100);
+            volume = if (volume > 100) 100 else (if (volume < 0) 0 else volume);
 
             {
-                const result = ma.ma_engine_set_volume(&engine, volume);
+                const result = ma.ma_engine_set_volume(&engine, volume / 100);
                 if(result != ma.MA_SUCCESS) {
                     stderr.print("Unable to set volume: {s}", .{ Utils.ma_get_error(result) }) catch { };
                     continue;
@@ -141,15 +143,12 @@ pub fn main(init: std.process.Init) void {
                 continue;
             }
             
-            var volume: f32 = std.fmt.parseFloat(f32, vol_arg.?) catch 1.0;
-            volume = if (volume > 1.0) 1.0 else (if (volume < 0.0) 0.0 else volume);
+            var volume: f32 = @floatFromInt(std.fmt.parseInt(i32, vol_arg.?, 10) catch 100);
+            volume = if (volume > 100) 100 else (if (volume < 0) 0 else volume);
 
-            var trigger = sound_map.get(trigger_name.?);
-            if(trigger == null) {
-                continue;
+            if(sound_map.get(trigger_name.?)) |trigger| {
+                trigger.set_volume(volume / 100);
             }
-
-            trigger.?.set_volume(volume);
         } else if (std.mem.eql(u8, command.?, "mute")) {
             mute = true;
         } else if (std.mem.eql(u8, command.?, "unmute")) {
@@ -173,7 +172,7 @@ pub fn main(init: std.process.Init) void {
     std.process.exit(0);
 }
 
-pub fn load_sound(
+fn load_sound(
     trigger_name: []const u8, 
     file_path: []const u8, 
     max_sounds: u32,
@@ -185,16 +184,15 @@ pub fn load_sound(
 
     const sound = sound_map.get(trigger_name) orelse blk: {
         const trigger = Trigger.init(allocator);
-        try sound_map.put(trigger_name, trigger);
-        break :blk sound_map.get(trigger_name); 
+        const key = try allocator.dupe(u8, trigger_name);
+        try sound_map.put(key, trigger);
+        break :blk sound_map.get(key);
     };
-
-    if(sound == null) return;
 
     sound.?.load_sound(file_path, max_sounds, engine, stderr, allocator);
 }
 
-pub fn play_sound(
+fn play_sound(
     trigger_name: []const u8,
     sound_map: *std.StringHashMap(*Trigger),
     rand: *const std.Random
@@ -205,3 +203,10 @@ pub fn play_sound(
     }
 }
 
+fn is_playing(sound_map: *std.StringHashMap(*Trigger)) bool {
+    var it = sound_map.iterator();
+    
+    return while (it.next()) |trigger| {
+        if (trigger.value_ptr.*.is_playing()) break true;
+    } else false;
+}
