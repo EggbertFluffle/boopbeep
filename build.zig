@@ -39,7 +39,7 @@ pub fn build_for_target(b: *std.Build, target: std.Build.ResolvedTarget, strip: 
     const translate_c = b.addTranslateC(.{
         .root_source_file = b.path("src/c.h"),
         .target = target,
-        .optimize = .Debug,
+        .optimize = .ReleaseSafe
     });
     translate_c.addIncludePath(miniaudio_dep.path("."));
 
